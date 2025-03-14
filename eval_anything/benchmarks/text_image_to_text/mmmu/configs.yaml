@@ -30,26 +30,20 @@ task:
     question_key: question
     answer_key: options
     ground_truth_key: answer
-    candidate_labels: [A, B, C, D]
-    avalable_evaluate_tools: ["RegexMatchText"]
+    candidate_labels: ["A", "B", "C", "D"]
+    avalable_evaluate_tools: ["match_open_ended"]
 answer_extractor:
-  - name: match_last_letter
-    function: regex_match_letter
+  - name: match_open_ended
+    function: regex_match_open
     args:
-      additional_pattern: "{original_pattern}"
-      match_index: -1   # Take the last match
-  - name: match_first_letter
-    function: regex_match_letter
-    args:
-      additional_pattern: "{original_pattern}"
-      match_index: 0
+      match_index: -1   # Index for multiple choice
 metrics:
   - name: accuracy
     function: accuracy
     args:
 overall_metrics:
-  - name: null
-    function: null
+  - name: average
+    function: average_across_tasks
     args:
       null
   

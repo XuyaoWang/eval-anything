@@ -24,7 +24,7 @@ from eval_anything.models.base_model import MODEL_MAP, CLASS_MAP
 from eval_anything.evaluate_tools.t2t_tools import *
 import eval_anything.evaluate_tools.t2t_tools as T2T_TOOLS
 from eval_anything.utils.utils import (
-    UUIDGenerator, read_cfgs_from_yaml, update_dict, 
+    read_cfgs_from_yaml, update_dict, 
     custom_cfgs_to_dict, BENCHMARK_MODALITY_MAP, pair_data_via_uuid,
     dict_to_namedtuple, namedtuple_to_dict
 )

@@ -9,7 +9,7 @@ Use pickle to automatically handle the serialization and deserialization of comp
 """
 
 import hashlib
-from typing import List, Tuple, Optional, Any
+from typing import List, Tuple, Optional, Any, Dict
 import pickle
 import os
 from pathlib import Path
@@ -18,6 +18,7 @@ import time
 
 from eval_anything.utils.data_type import InferenceInput, InferenceOutput
 from eval_anything.utils.logger import EvalLogger
+from eval_anything.utils.uuid import UUIDGenerator
 
 class BinaryCache:
     """Binary cache implementation with support for multiple tensor types"""
@@ -26,18 +27,18 @@ class BinaryCache:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logger
+        self.uuid_generator = UUIDGenerator()
         
-    def _get_cache_path(self, key: str) -> Path:
+    def _get_cache_path(self, key: Dict[str, Any]) -> Path:
         """Get cache file path from key"""
-        hashed_key = hashlib.sha256(key.encode()).hexdigest()
-        return self.cache_dir / f"{hashed_key}.pkl"
+        return self.cache_dir / f"{self.uuid_generator(key)}.pkl"
 
-    def is_cached(self, key: str) -> bool:
+    def is_cached(self, key: Dict[str, Any]) -> bool:
         """Check if the key is cached"""
         cache_path = self._get_cache_path(key)
         return cache_path.exists()
     
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: Dict[str, Any]) -> Optional[Any]:
         """Retrieve object from cache"""
         cache_path = self._get_cache_path(key)
         if not cache_path.exists():
@@ -52,7 +53,7 @@ class BinaryCache:
             self.logger.log('error', f"Failed to load cached object with key {key}. Error: {e}")
             return None
             
-    def put(self, key: str, value: Any) -> bool:
+    def put(self, key: Dict[str, Any], value: Any) -> bool:
         """Store object in cache"""
         cache_path = self._get_cache_path(key)
         try:
@@ -86,53 +87,14 @@ class CacheManager:
         """
         self.cache_dir = cache_dir
         self.binary_cache = BinaryCache(cache_dir, logger)
-        
-    def get_cache_path(self, model_cfg: namedtuple, infer_cfgs: namedtuple, inputs: List[InferenceInput]) -> Tuple[str, bool]:
-        """Get cache path and check if exists"""
-        # Get base model name
-        model_name = getattr(model_cfg, 'model_id', time.strftime("%Y%m%d_%H%M%S", time.localtime()))
-        
-        # Get all relevant inference parameters
-        infer_params = []
-        
-        # Get only the actual fields from the namedtuple
-        for field in infer_cfgs._fields:
-            value = getattr(infer_cfgs, field)
-            if value is not None:
-                infer_params.append(f"{field}={value}")
-
-        # Append inference parameters to model name
-        if infer_params:
-            model_name = f"{model_name}_{'_'.join(infer_params)}"
-        
-        # Create deterministic string representation of inputs
-        input_strings = []
-        for data in inputs:
-            # Include task and text (if present)
-            input_str = f"task:{data.task}"
-            if data.text is not None:
-                input_str += f"|text:{data.text}"
-            
-            # Include UUID if present
-            if data.uuid:
-                uuid_str = '|'.join(f"{k}:{self._normalize_value(v)}" 
-                                  for k, v in sorted(data.uuid.items()))
-                input_str += f"|uuid:{uuid_str}"
-                
-            # Include multimodal data if present
-            if data.mm_data:
-                urls = [item.url for item in data.mm_data]
-                input_str += f"|urls:{','.join(urls)}"
-                
-            input_strings.append(input_str)
-        
-        # Sort for deterministic ordering
-        input_strings.sort()
-        
-        # Create hash from concatenated string
-        inputs_hash = hashlib.md5(''.join(input_strings).encode()).hexdigest()
-        cache_key = f"{model_name}_{inputs_hash}"
-        
+        self.uuid_generator = UUIDGenerator()
+    
+    def get_cache_path(self, model_cfg: namedtuple, infer_cfg: namedtuple, inputs: List[InferenceInput]) -> Tuple[str, bool]:
+        cache_key = self.uuid_generator({
+            'model_cfg': model_cfg,
+            'infer_cfg': infer_cfg,
+            'inputs': inputs
+        })
         return cache_key, self.binary_cache.is_cached(cache_key)
 
     def _normalize_value(self, value: any) -> str:

@@ -22,7 +22,6 @@ from datasets import load_dataset
 
 from eval_anything.dataloader.base_dataloader import BaseDataLoader, TASK_TYPE_MAP
 from eval_anything.utils.register import MMDatasetRegistry
-# from eval_anything.utils.registry import TemplateRegistry as get_template_class
 from eval_anything.utils.data_type import InferenceInput
 from eval_anything.utils.utils import get_project_root
 
@@ -45,8 +44,6 @@ class MMDataLoader(BaseDataLoader):
                 enable_cot=self.enable_cot,
                 num_shot=self.num_shot
             )
-            if self.num_shot:
-                dataset_formatter.set_few_shot_examples(self.set_fewshot_dataset(task.name))
             prompts[task.name] = dataset_formatter(dataset)
         return prompts
 

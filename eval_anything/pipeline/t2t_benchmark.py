@@ -17,7 +17,7 @@ import json
 import os
 from typing import Dict, List
 from eval_anything.utils.data_type import InferenceInput
-from eval_anything.utils.utils import pair_data_via_uuid, UUIDGenerator
+from eval_anything.utils.utils import pair_data_via_uuid
 from collections import namedtuple
 from eval_anything.utils.register import BenchmarkRegistry
 from eval_anything.utils.logger import EvalLogger

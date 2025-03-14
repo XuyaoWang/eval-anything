@@ -9,8 +9,8 @@ TODO 还需适配
 
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
-
+from typing import Dict, List, Optional, Union, Any
+import json
 import PIL
 import torch
 from openai.types.chat.chat_completion import ChatCompletion
@@ -20,6 +20,7 @@ from enum import Enum
 from eval_anything.evaluate_tools.t2t_tools import T2T_JUDGER_MAP
 import eval_anything.evaluate_tools.t2t_tools as T2T_TOOLS
 import numpy as np
+from eval_anything.utils.uuid import UUIDGenerator
 
 @dataclass
 class RewardModelOutput:
@@ -72,65 +73,42 @@ class MultiModalData:
 
 @dataclass
 class InferenceInput:
-    '''
-    Args:
-        task: The task name.
-        text: The text to be completed.
-        url: The url of the image to be completed.
-        file: The image to be completed.
-        modality: The modality of the image to be completed.
-    '''
-
-    text: str
-    mm_data: MultiModalData
-    metadata: dict = None
-
+    task: str
+    conversation: dict
     def __init__(
         self,
         task: str,
-        text: str,
+        conversation: List[Dict[str, str]],
         text_id: str = None,
-        urls: List[str] | str | None = None,
-        data_files = None,
         ref_answer: str | dict[str, list] | List[any] | int | None = None,
         uuid: Dict[str, str] = None,
         metadata: dict = None
     ):
         self.task = task
-        self.text = text
+        self.conversation = conversation
         self.text_id = text_id
-        self.uuid = uuid or {}
         self.ref_answer = ref_answer    # ground_truth
         self.metadata = metadata or {}  # Store benchmark-specific data
 
-        # FIXME: Decide data structure of urls
-        if isinstance(urls, str):
-            urls = [urls]
-        urls = urls or []
-
-        # FIXME: Decide data structure of data_files
-        if data_files is None:
-            data_files = [None] * len(urls)
-        elif isinstance(data_files, (str, bytes, PIL.Image.Image)):
-            data_files = [data_files]
-
-        # Create MultiModalData objects
-        # FIXME: mm_data: List[MultiModalData] or MultiModalData ?
-        self.mm_data = [MultiModalData(url, file) for url, file in zip(urls, data_files)]
-
-    def __repr__(self):
-        return f'InferenceInput(' f'text={self.text!r}),' f'mm_data={self.mm_data!r})'
-
-    def to_dict(self):
-        return {
+        self.uuid_generator = UUIDGenerator()
+        self.uuid = self.uuid_generator({
             "task": self.task,
-            "text": self.text,
-            "urls": [mm_data.url for mm_data in self.mm_data],
-            "ref_answer": self.ref_answer,
-            "uuid": self.uuid,
-            "metadata": self.metadata
-        }
+            "conversation": self.conversation
+        })
 
+    def __str__(self):
+        return json.dumps({
+            "task": self.task,
+            "conversation": self.conversation
+        }, ensure_ascii=False, indent=4)
+        
+    def __repr__(self):
+        return self.__str__()
+    
+    def __eq__(self, other):
+        if not isinstance(other, InferenceInput):
+            return False
+        return self.uuid == other.uuid
 
 @dataclass
 class InferenceOutput:

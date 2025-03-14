@@ -8,41 +8,46 @@
     task_uid: 111
     # benchmark name and task name, if the task list is empty, all tasks will be evaluated
     benchmarks: {
-      "gsm8k": ["main"],
-      "mmlu": ["global_facts"],
-      "HumanEval": ["openai_humaneval"],
-      "AGIEval": ['aqua-rat', 'gaokao-biology', 'gaokao-chemistry', 'gaokao-chinese', 'gaokao-english', 'gaokao-geography', 'gaokao-history', 'gaokao-mathcloze', 'gaokao-mathqa', 'gaokao-physics', 'jec-qa-ca', 'jec-qa-kd', 'logiqa-en', 'logiqa-zh', 'lsat-ar', 'lsat-lr', 'lsat-rc', 'math', 'sat-en', 'sat-en-without-passage', 'sat-math'],
-      "TruthfulQA": ["generation"],
+      #"gsm8k": ["main"],
+      #"mmlu": ["global_facts"],
+      #"HumanEval": ["openai_humaneval"],
+      #"AGIEval": ['gaokao-biology'],
+      #"TruthfulQA": ["generation"],
       "mmmu": ["Accounting"],
       }
     # Num shot
     n_shot: {
-      "gsm8k": 5,
-      "mmlu": 0,
-      "HumanEval": 0,
-      "AGIEval": 5,
-      "TruthfulQA": 6,
-      "mmmu": 5,
+      #"gsm8k": 5,
+      #"mmlu": 0,
+      #"HumanEval": 0,
+      #"AGIEval": 5,
+      #"TruthfulQA": 6,
+      "mmmu": 0,
       }
     # Chain of thought
     cot: {
-      "gsm8k": True,
-      "mmlu": True,
-      "HumanEval": False,
-      "AGIEval": False,
-      "TruthfulQA": False,
+      #"gsm8k": True,
+      #"mmlu": True,
+      #"HumanEval": False,
+      #"AGIEval": False,
+      #"TruthfulQA": False,
       "mmmu": False,
       }
+    # Visualization
+    visualization:
+      enable: false
+      port: 8080
+      share: false
   # The model configurations
   model_cfgs:
     # Pretrained model unique identity
-    model_id: Llama3.1-8B-Instruct
+    model_id: Llava-1.5-7B-HF
     # Pretrained model name or path
-    model_name_or_path: meta-llama/Llama-3.1-8B-Instruct
+    model_name_or_path: /aifs4su/yaodong/models/llava-1.5-7b-hf
     # Model type ("LM" or "MM")
-    model_type: "LM"
+    model_type: "MM"
     # Chat template
-    chat_template: Llama3
+    chat_template: Llava
   infer_cfgs:
     # Inference backend
     infer_backend: "vllm"
@@ -69,9 +74,9 @@
     # Beam Search size
     num_beams: null
     # Number of GPUs
-    num_gpu: 2
+    num_gpu: 8
     # Available GPU IDs. If not specified, first num_gpu GPUs will be used.
-    gpu_ids: [0,1]
+    gpu_ids: [0,1,2,3,4,5,6,7]
     # GPU utilization
     gpu_utilization: 0.8
     

@@ -1,5 +1,11 @@
+from typing import List, Dict, Union
 import os
+import re
 import ast
+import base64
+import PIL
+from PIL import Image
+from io import BytesIO
 from eval_anything.utils.register import MMDatasetRegistry
 from eval_anything.utils.data_type import InferenceInput
 import eval_anything.utils.utils as utils
@@ -42,6 +48,22 @@ class BaseMMDataset:
         prompt = self.prompt_builder.build_prompt(item[self.task.question_key], item[self.task.answer_key])
         return prompt
     
+    def encode_image_to_base64(self, image: Union[str, "PIL.Image"]) -> str:
+        """Get base64 from image"""
+        if isinstance(image, str):
+            image_input = Image.open(image)
+        else:
+            image_input = image
+        
+        if image_input.mode != "RGB":
+            image_input = image_input.convert("RGB")
+
+        buffer = BytesIO()
+        image_input.save(buffer, format="JPEG")
+        img_bytes = buffer.getvalue()
+        base64_data = base64.b64encode(img_bytes).decode("utf-8")
+        return base64_data
+    
     def _to_InferenceInput(self, dataset: Dataset):
         pass
 
@@ -53,44 +75,123 @@ class MMMUDataset(BaseMMDataset):
     def __init__(self, bench_cfgs: namedtuple, task: namedtuple, enable_cot: bool, num_shot: int):
         super().__init__(bench_cfgs, task, enable_cot, num_shot)
 
-    def build_multi_choice_prompt(self, item: dict):
-        self.prompt_builder = MultiChoicePromptBuilder(
-            candidate_labels=self.task.candidate_labels,
-            few_shot_examples=self.few_shot_examples,
-            cot=self.enable_cot
-        )
-        prompt = self.prompt_builder.build_prompt(item[self.task.question_key], ast.literal_eval(item[self.task.answer_key]))
-        return prompt
+    def get_image_indice(self, text: str)->List[int]:
+        pattern = r'<image (\d+)>'
+        matches = re.findall(pattern, text)
+        return [int(num) for num in matches]
+    
+    def prompt_to_conversation(
+            self, 
+            user_prompt: str, 
+            system_prompt: Union[str, None] = None, 
+            images: Union[List[PIL.Image], List[str]] = []
+        ) -> List[Dict]:
+        """
+        Convert input prompt to the specified conversation format
+        
+        Args:
+            user_prompt (str): Input user_prompt with image placeholders in <image n> format
+            system_prompt (str): Input system_prompt (if exists)
+            images (list): List of PIL.Image objects to be encoded and inserted into the conversation
+            
+        Returns:
+            list: Conversation object in the specified format
+        """
+        image_pattern = re.compile(r'<image (\d+)>')
+        matches = list(image_pattern.finditer(user_prompt))
+        assert len(images) == len(matches), f"Number of images ({len(images)}) does not match number of placeholders ({len(matches)}), input user_prompt: {user_prompt}"
+        
+        content_parts = []
+        
+        if not matches:
+            if user_prompt:
+                content_parts.append({
+                    "type": "text",
+                    "text": user_prompt
+                })
+        else:
+            if matches[0].start() > 0:
+                content_parts.append({
+                    "type": "text",
+                    "text": user_prompt[:matches[0].start()]
+                })
+            
+            for i, match in enumerate(matches):
+                content_parts.append({
+                    "type": "image",
+                    "image": f"data:image/jpeg;base64,{self.encode_image_to_base64(images[i])}"
+                })
+                
+                text_start = match.end()
+                text_end = matches[i+1].start() if i+1 < len(matches) else len(user_prompt)
+                
+                if text_end > text_start:
+                    content_parts.append({
+                        "type": "text",
+                        "text": user_prompt[text_start:text_end]
+                    })
+
+        conversation = [
+            {
+                "role": "user",
+                "content": content_parts
+            }
+        ]
+
+        if system_prompt is not None:
+            conversation.insert(0, {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": system_prompt
+                    }
+                ]
+            })
+        
+        return conversation
 
     def set_few_shot_examples(self, few_shot_dataset: Dataset | None):
-        for item in list(few_shot_dataset)[:self.num_shot]:
-            images = []
-            for i in range(1, 8):
-                if item[f"image_{i}"]:
-                    images.append(item[f"image_{i}"])
-            self.few_shot_mm_examples.append(images)
+        raise NotImplementedError("MMMU does not support few-shot learning.")
 
-            self.few_shot_examples.append({
-                "question": item[self.task.question_key],
-                "candidate_answers": ast.literal_eval(item[self.task.answer_key]),
-                "ground_truth": item[self.task.ground_truth_key]
-            })
-
-    def _to_InferenceInput(self, dataset: Dataset):
+    # refer: https://github.com/MMMU-Benchmark/MMMU/blob/main/mmmu/utils/data_utils.py#L136
+    def _to_InferenceInput(self, dataset: Dataset) -> List["InferenceInput"]:
+        """
+        Convert a dataset to a list of InferenceInput objects.
+        
+        Args:
+            dataset: Dataset object containing questions, options, and images
+            
+        Returns:
+            List of InferenceInput objects ready for model inference
+        """
         inference_inputs = []
         
         for item in dataset:
-            images = []
-            for i in range(1, 8):
-                if item[f"image_{i}"]:
-                    images.append(item[f"image_{i}"])
+            question = item['question']
+            if item['question_type'] == 'multiple-choice':
+                options = eval(item['options'])
+                example = ""
+                letter_to_option = {}
+                
+                for idx, option in enumerate(options):
+                    option_letter = chr(ord('A') + idx)
+                    example += f"({option_letter}) {option}\n"
+                    letter_to_option[option_letter] = option
+                
+                formatted_prompt = f"{question}\n\n{example}\n\nAnswer with the option's letter from the given choices directly."
+            else:
+                formatted_prompt = f"{question}\n\nAnswer the question using a single word or phrase."
+            
+            image_ids = self.get_image_indice(formatted_prompt)
+            images = [item[f'image_{id}'] for id in image_ids]
+            conversation = self.prompt_to_conversation(formatted_prompt, images=images)
+
             inference_inputs.append(
                 InferenceInput(
                     task=self.task.name,
-                    text=self.build_multi_choice_prompt(item),
-                    data_files=self.few_shot_mm_examples + images,
-                    ref_answer=item[self.task.ground_truth_key],
+                    conversation=conversation,
+                    ref_answer=item['answer']
                 )
             )
         return inference_inputs
-    
