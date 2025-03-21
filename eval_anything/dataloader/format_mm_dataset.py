@@ -219,6 +219,4 @@ class MMVUDataset(BaseMMDataset):
                     ref_answer=item['answer']
                 )
             )
-            if len(inference_inputs) == 10:
-                break
         return inference_inputs
