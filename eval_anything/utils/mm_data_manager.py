@@ -360,7 +360,29 @@ class VideoManager:
         min_pixels: int = 4 * 28 * 28,
         max_pixels: int = 16384 * 28 * 28
     ) -> str:
-        """Encode video to base64 with frame extraction."""
+        """
+        Encode video to base64 string by extracting and processing frames.
+        
+        This function takes a video input (URL, file path, list of images, or numpy array),
+        extracts frames at a specified rate, resizes them if necessary to meet size constraints,
+        and encodes them as base64 strings separated by commas.
+        
+        Args:
+            video: Input video as a URL/path string, list of PIL Images, or numpy array with shape (frames, height, width, channels)
+            fps: Target frames per second for extraction (default: 1.0)
+            fps_min_frames: Minimum number of frames to extract (default: 4)
+            fps_max_frames: Maximum number of frames to extract (default: 768)
+            frame_factor: Factor to ensure frame count is divisible by this value (default: 2)
+            image_factor: Factor for dimension rounding in resizing (default: 28)
+            min_pixels: Minimum total pixels allowed in resized frames (default: 3,136)
+            max_pixels: Maximum total pixels allowed in resized frames (default: 12,845,056)
+        
+        Returns:
+            str: Comma-separated base64-encoded JPEG frames
+        
+        Raises:
+            ValueError: If video format is unsupported or encoding fails
+        """
         try:
             # Extract frames
             if isinstance(video, str):
