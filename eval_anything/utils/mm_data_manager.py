@@ -10,7 +10,6 @@ from io import BytesIO
 from typing import List, Dict, Union, Tuple, Optional
 import base64
 import re
-import io
 from scipy.io import wavfile
 import numpy as np
 import librosa
@@ -20,7 +19,7 @@ import os
 import requests
 import torch
 import math
-from torchvision import io
+from torchvision.io.video import read_video
             
             
 
@@ -174,7 +173,7 @@ class AudioManager:
                 base64_data = base64_string
             
             binary_data = base64.b64decode(base64_data)
-            buffer = io.BytesIO(binary_data)
+            buffer = BytesIO(binary_data)
             
             sample_rate, audio_array = wavfile.read(buffer)
             
@@ -198,7 +197,7 @@ class AudioManager:
         Returns:
             str: Base64 encoded audio data
         """
-        buffer = io.BytesIO()
+        buffer = BytesIO()
         
         if audio_array.dtype != np.int16:
             # Normalize float audio to [-1, 1] range if needed
@@ -398,7 +397,7 @@ class VideoManager:
                     path = video
                 
                 # Read video and sample frames
-                tensor, _, info = io.read_video(path, pts_unit="sec", output_format="TCHW")
+                tensor, _, info = read_video(path, pts_unit="sec", output_format="TCHW")
                 total = tensor.shape[0]
                 count = min(max(int(total / info["video_fps"] * fps), fps_min_frames), fps_max_frames, total)
                 count = (count // frame_factor) * frame_factor
